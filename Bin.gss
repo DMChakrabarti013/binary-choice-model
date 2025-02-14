@@ -1,0 +1,135 @@
+N = 3000;
+storebh = {};
+storeb = {};
+
+i = 1;
+rep = 25 ;
+Do while i .le rep;
+    
+/*             Data Generation         */
+seed1 = 1000  + i;
+seed2 = 6000  + i;
+seed3 = 11000 + i;
+X = .5*(rndns(N,2,seed1)) ~ones(N,1);
+S = exp( x[.,1] + x[.,2]);
+w = rndns(N,1,seed2);
+a = 1|1|0;
+T  = X*a .gt w;    @No-Het Model@
+Th = X*a .gt S.*w; @Het Model@
+     
+
+/*         No Het Results         */ ;
+startM = inv(X'X)*X'T; @OLS Estimator@
+start = startM;
+D = T~X;
+
+Library maxlik;
+maxset;
+{b,f,g,c,ret} = maxlik(D,0,&prob,start);
+storeb = storeb|b';
+
+
+/*         Het Results        */   
+
+startM = inv(X'X)*X'Th;
+startS = zeros(2,1);
+start = startM|startS;
+Dh = Th~X;
+
+Library maxlik;
+maxset;
+{bh,f,g,ch,ret} = maxlik(Dh,0,&Hprob,start);
+storebh = storebh|bh';
+  
+i = i + 1;
+endo;  
+
+Print "1. Means and standard deviations of No-Het Results";
+meanc(storeb);
+stdc(storeb);
+Print " ";
+
+
+Print "2.  Marginal Effects when there is No Het";
+/*Marginal Effects*/
+EM = X*b[1:3];
+Pbase = cdfn(X*b[1:3]);
+t1 = X[.,1] .le quantile(X[.,1],.25);
+t2 = X[.,1] .gt quantile(X[.,1],.75);
+EM = ((X[.,1]+1)~X[.,2]~X[.,3])*b[1:3];
+Pnew = cdfn( ((X[.,1]+1) ~ X[.,2] ~ X[.,3]) * b[1:3] );
+M = Pnew-Pbase;
+AM1 = meanc( selif(M,t1) );
+AM = meanc(M);
+AM2 = meanc( selif(M,t2) );
+AM1;
+AM2;
+AM;
+Print " ";
+
+
+
+Print "3. Means and standard deviations of the Het Results";
+meanc(storebh);
+stdc(storebh);
+Print " ";
+
+
+Print "4. Marginal Effects when there is Het";
+/*Marginl Effects*/
+EM = X*bh[1:3];
+ES = exp( X[.,1]*bh[4] + X[.,2]*bh[5] );
+Pbase = cdfn((X*bh[1:3]) ./ exp( X[.,1]*bh[4] + X[.,2]*bh[5] ));
+t1 = X[.,1] .le quantile(X[.,1],.25);
+t2 = X[.,1] .ge quantile(X[.,1],.75);
+EM = ( (X[.,1]+1)~X[.,2]~X[.,3])*bh[1:3];
+ES = exp( (X[.,1]+1)*bh[4] + X[.,2]*bh[5] );
+Pnew = cdfn( (((X[.,1]+1) ~ X[.,2] ~ X[.,3]) * bh[1:3]) ./ ES );
+
+M = Pnew-Pbase;
+AM1h = meanc( selif(M,t1) );
+AMh = meanc(M);
+AM2h = meanc( selif(M,t2) );
+am1h;
+Am2h;
+Amh;
+Print " ";
+
+
+
+Print "5. Wald Test for Het when there is Het";
+
+bs = bh[4:5];
+Cs = Ch[4:5,4:5];
+WT =  bs' * inv(Cs) * bs    ; @complete@
+df = 2;              @complete@
+Pval = cdfchic(WT,df);
+WT;
+Pval;
+
+
+/*Programs*/
+   
+Proc prob(b,D);
+Local T,X,K,M,v,P,P1,P0,LogL;
+T = D[.,1];
+X = D[.,2:cols(D)];
+M = X*b[1:3];                 
+P1 = cdfn(M);
+P0 = 1-P1;
+LogL = T.*Ln(P1) + (1-T) .* Ln(P0);@complete: Nx1 vector of ln likelihoods@
+retp(LogL);  
+endp;
+
+
+Proc Hprob(b,D);
+Local Th,X,M,S,v,P,P1,P0,Ps,LogL;
+Th = D[.,1];
+X = D[.,2:cols(D)];
+M = X*b[1:3];
+S = exp( X[.,1:2]*b[4:5] );
+v = M./ S ;   
+P = cdfn(v);                @Probabilities depend on v@
+LogL = Th .* Ln(P) + (1 - Th) .* Ln(1 - P);    @complete: Nx1 vector of ln likelihoods@
+retp(LogL);  
+endp;
